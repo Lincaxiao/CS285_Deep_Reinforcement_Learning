@@ -9,6 +9,7 @@ from collections import OrderedDict
 import cv2
 import numpy as np
 import time
+import torch
 
 from cs285.infrastructure import pytorch_util as ptu
 
@@ -18,6 +19,7 @@ def sample_trajectory(env, policy, max_path_length, render=False):
     
     # initialize env for the beginning of a new rollout
     ob =  env.reset() # TODO: initial observation after resetting the env
+    
 
     # init vars
     obs, acs, rewards, next_obs, terminals, image_obs = [], [], [], [], [], []
@@ -34,8 +36,14 @@ def sample_trajectory(env, policy, max_path_length, render=False):
     
         # TODO: use the most recent ob to decide what to do
         # HINT: this is a numpy array
-        ac = policy.act(ob) 
-        ac = ac[0]
+        # 将ob转换为tensor
+        ob_tensor = torch.FloatTensor(ob).unsqueeze(0).to(ptu.device)
+        ac_dist = policy.forward(ob_tensor)
+        # 从动作分布中采样动作，if-else语句兼容不同的动作分布
+        if isinstance(ac_dist, torch.Tensor): # 如果ac_dist是tensor
+            ac = ac_dist.cpu().detach().numpy()[0]
+        else:
+            ac = ac_dist.sample().cpu().numpy()[0]
 
         # TODO: take that action and get reward and next ob
         next_ob, rew, done, _ = env.step(ac)
